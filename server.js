@@ -140,57 +140,75 @@ const upload = multer({
     }
 });
 
-// Update your complete-task route in server.js
+// Make sure you have proper imports
 app.post('/complete-task/:taskId', upload.single('screenshot'), async (req, res) => {
     try {
+        console.log('Starting task completion...');
+        console.log('User:', req.user._id);
+        console.log('Task ID:', req.params.taskId);
+        console.log('File:', req.file);
+
         if (!req.isAuthenticated()) {
+            console.log('User not authenticated');
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
         if (!req.file) {
+            console.log('No file uploaded');
             return res.status(400).json({ error: 'Screenshot is required' });
         }
 
         const taskId = req.params.taskId;
         const userId = req.user._id;
-        const screenshotUrl = req.file.secure_url; // From Cloudinary
+        const screenshotUrl = req.file.secure_url;
 
-        console.log('Completing task:', { taskId, userId, screenshotUrl });
+        console.log('Processing with:', { taskId, userId, screenshotUrl });
 
-        // Find the task and update user's submission
+        // Find task first to verify it exists
         const task = await Task.findById(taskId);
         
         if (!task) {
+            console.log('Task not found');
             return res.status(404).send('Task not found');
         }
 
-        // Add the user's submission
-        task.userTasks.push({
-            userId: userId,
-            completed: true,
-            screenshotUrl: screenshotUrl,
-            completedAt: new Date(),
-            status: 'pending'
-        });
+        console.log('Found task:', task);
 
-        await task.save();
-        console.log('Task updated successfully');
+        // Check if user already has a submission
+        const existingSubmissionIndex = task.userTasks.findIndex(
+            ut => ut.userId?.toString() === userId.toString()
+        );
 
-        // Send email notification to admin
-        if (process.env.ADMIN_EMAIL) {
-            try {
-                await sendTaskCompletionEmail(req.user, task, screenshotUrl);
-                console.log('Admin notification email sent');
-            } catch (emailError) {
-                console.error('Error sending email:', emailError);
-            }
+        if (existingSubmissionIndex >= 0) {
+            // Update existing submission
+            console.log('Updating existing submission');
+            task.userTasks[existingSubmissionIndex] = {
+                userId: userId,
+                completed: true,
+                screenshotUrl: screenshotUrl,
+                completedAt: new Date(),
+                status: 'pending'
+            };
+        } else {
+            // Add new submission
+            console.log('Adding new submission');
+            task.userTasks.push({
+                userId: userId,
+                completed: true,
+                screenshotUrl: screenshotUrl,
+                completedAt: new Date(),
+                status: 'pending'
+            });
         }
+
+        const updatedTask = await task.save();
+        console.log('Task saved successfully:', updatedTask);
 
         res.redirect('/dashboard');
 
     } catch (error) {
         console.error('Error completing task:', error);
-        res.status(500).send('Error completing task');
+        res.status(500).send('Error completing task: ' + error.message);
     }
 });
 
@@ -605,13 +623,12 @@ app.get('/admin/dashboard', isAdmin, async (req, res) => {
     }
 });
 
-// Update the review submission route in server.js
 app.post('/admin/review-submission/:taskId/:userId', isAdmin, async (req, res) => {
     try {
         const { taskId, userId } = req.params;
         const { status, feedback } = req.body;
 
-        console.log('Reviewing submission:', { taskId, userId, status, feedback });
+        console.log('Review submission params:', { taskId, userId, status, feedback });
 
         const task = await Task.findById(taskId);
         
@@ -620,10 +637,15 @@ app.post('/admin/review-submission/:taskId/:userId', isAdmin, async (req, res) =
             return res.status(404).send('Task not found');
         }
 
-        // Find the user's submission
+        console.log('Found task:', task);
+        console.log('Current userTasks:', task.userTasks);
+
+        // Find the specific user submission
         const submissionIndex = task.userTasks.findIndex(
-            ut => ut.userId.toString() === userId
+            ut => ut.userId?.toString() === userId.toString()
         );
+
+        console.log('Submission index:', submissionIndex);
 
         if (submissionIndex === -1) {
             console.log('Submission not found');
@@ -631,16 +653,21 @@ app.post('/admin/review-submission/:taskId/:userId', isAdmin, async (req, res) =
         }
 
         // Update the submission
-        task.userTasks[submissionIndex].status = status;
-        task.userTasks[submissionIndex].feedback = feedback;
+        task.userTasks[submissionIndex] = {
+            ...task.userTasks[submissionIndex],
+            status: status,
+            feedback: feedback
+        };
 
-        await task.save();
-        console.log('Review saved successfully');
+        console.log('Updated userTasks:', task.userTasks);
+
+        const savedTask = await task.save();
+        console.log('Saved task:', savedTask);
 
         res.redirect('/admin/dashboard');
     } catch (error) {
         console.error('Review submission error:', error);
-        res.status(500).send('Error updating review');
+        res.status(500).send('Error updating review: ' + error.message);
     }
 });
 
@@ -867,6 +894,18 @@ app.get('/admin/initialize-tasks', isAdmin, async (req, res) => {
                 <pre class="mt-4 bg-red-50 p-2 rounded">${error.stack}</pre>
             </div>
         `);
+    }
+});
+
+app.get('/test/tasks', isAdmin, async (req, res) => {
+    try {
+        const tasks = await Task.find().populate('userTasks.userId');
+        res.json({
+            totalTasks: tasks.length,
+            tasks: tasks
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
