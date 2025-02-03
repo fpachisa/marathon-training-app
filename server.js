@@ -26,6 +26,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Session configuration - MUST be before passport middleware
+app.set('trust proxy', 1);
+
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
@@ -35,9 +37,12 @@ app.use(session({
         ttl: 24 * 60 * 60 // Session TTL in seconds (1 day)
     }),
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
+        secure: true, // Required for production
+        sameSite: 'none', // Required for production
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        httpOnly: true
+    },
+    proxy: true // Required for production
 }));
 
 // Passport middleware
@@ -577,6 +582,24 @@ app.post('/admin/review-task/:taskId', isAdmin, async (req, res) => {
         console.error('Review submission error:', error);
         res.status(500).send('Error submitting review');
     }
+});
+
+// Add these routes for testing
+app.get('/session-test', (req, res) => {
+    res.json({
+        sessionId: req.sessionID,
+        isAuthenticated: req.isAuthenticated(),
+        session: req.session
+    });
+});
+
+app.get('/env-test', (req, res) => {
+    res.json({
+        nodeEnv: process.env.NODE_ENV,
+        domain: process.env.DOMAIN,
+        hasSecret: !!process.env.SESSION_SECRET,
+        hasMongoUri: !!process.env.MONGODB_URI
+    });
 });
 
 // Logout route
