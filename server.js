@@ -16,6 +16,13 @@ const CALLBACK_URL = process.env.NODE_ENV === 'production'
 
 const app = express();
 
+
+const express = require('express');
+const session = require('express-session');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
+
 // Connect to MongoDB
 connectDB();
 
@@ -43,45 +50,49 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Passport configuration
-passport.use(
-    new GoogleStrategy(
-        {
-    		clientID: process.env.GOOGLE_CLIENT_ID,
-    		clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    		callbackURL: CALLBACK_URL,
-		userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
-        },
-        async function(accessToken, refreshToken, profile, cb) {
-            try {
-                console.log('Google profile:', profile); // Debug log
-                let user = await User.findOne({ googleId: profile.id });
-                
-                if (!user) {
-                    user = await User.create({
-                        googleId: profile.id,
-                        email: profile.emails[0].value,
-                        displayName: profile.displayName
-                    });
-                }
-                
-                return cb(null, user);
-            } catch (error) {
-                console.error('Google Strategy Error:', error);
-                return cb(error, null);
-            }
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: `${process.env.DOMAIN}/auth/google/callback`,
+    userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+}, async function(accessToken, refreshToken, profile, cb) {
+    console.log('Google strategy callback received');
+    try {
+        console.log('Looking for existing user...');
+        let user = await User.findOne({ googleId: profile.id });
+        
+        if (!user) {
+            console.log('Creating new user...');
+            user = await User.create({
+                googleId: profile.id,
+                email: profile.emails[0].value,
+                displayName: profile.displayName
+            });
+            console.log('New user created:', user);
+        } else {
+            console.log('Existing user found:', user);
         }
-    )
-);
+        
+        return cb(null, user);
+    } catch (error) {
+        console.error('Error in Google Strategy:', error);
+        return cb(error, null);
+    }
+}));
 
 passport.serializeUser((user, done) => {
+    console.log('Serializing user:', user);
     done(null, user.id);
 });
 
 passport.deserializeUser(async (id, done) => {
+    console.log('Deserializing user ID:', id);
     try {
         const user = await User.findById(id);
+        console.log('Deserialized user:', user);
         done(null, user);
     } catch (error) {
+        console.error('Deserialization error:', error);
         done(error, null);
     }
 });
@@ -117,7 +128,7 @@ app.get('/test', (req, res) => {
 // Auth Routes
 app.get('/auth/google',
     (req, res, next) => {
-        console.log('Starting Google authentication'); // Debug log
+        console.log('Starting Google authentication...');
         next();
     },
     passport.authenticate('google', { 
@@ -127,9 +138,17 @@ app.get('/auth/google',
 );
 
 app.get('/auth/google/callback', 
-    passport.authenticate('google', { failureRedirect: '/login' }),
-    function(req, res) {
-        console.log('Google authentication successful'); // Debug log
+    (req, res, next) => {
+        console.log('Received callback from Google');
+        next();
+    },
+    passport.authenticate('google', { 
+        failureRedirect: '/',
+        failureFlash: true
+    }),
+    (req, res) => {
+        console.log('Authentication successful');
+        console.log('User:', req.user);
         res.redirect('/dashboard');
     }
 );
