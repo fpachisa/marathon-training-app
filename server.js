@@ -794,6 +794,47 @@ app.get('/admin/initialize-tasks', isAdmin, async (req, res) => {
     }
 });
 
+// Add this route to verify MongoDB connection
+app.get('/admin/check-db', isAdmin, async (req, res) => {
+    try {
+        // Check MongoDB connection
+        const dbState = mongoose.connection.readyState;
+        const states = {
+            0: 'disconnected',
+            1: 'connected',
+            2: 'connecting',
+            3: 'disconnecting'
+        };
+        
+        // Test database operation
+        const stats = await mongoose.connection.db.stats();
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Database Check</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+            </head>
+            <body class="bg-gray-50 p-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-8">
+                    <h1 class="text-2xl font-bold mb-4">Database Status</h1>
+                    <div class="space-y-4">
+                        <p><strong>Connection State:</strong> ${states[dbState]}</p>
+                        <p><strong>Database Name:</strong> ${mongoose.connection.name}</p>
+                        <p><strong>Collections:</strong> ${stats.collections}</p>
+                        <p><strong>Total Documents:</strong> ${stats.objects}</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Database check error:', error);
+        res.status(500).send('Error checking database: ' + error.message);
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
