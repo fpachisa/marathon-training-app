@@ -41,7 +41,7 @@ const taskSchema = new mongoose.Schema({
     reviewedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
-    }
+    },
     // User-specific task status
     userTasks: [{
         userId: {
