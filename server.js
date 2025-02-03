@@ -7,7 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const { connectDB } = require('./config/database');
 const User = require('./models/User');
-const Task = mongoose.model('Task', taskSchema);
+const Task = require('./models/Task');
 const MongoStore = require('connect-mongo');
 
 const CALLBACK_URL = process.env.NODE_ENV === 'production'
