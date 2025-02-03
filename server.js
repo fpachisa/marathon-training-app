@@ -309,7 +309,6 @@ app.get('/test-cloudinary', async (req, res) => {
 });
 
 
-
 // Admin middleware
 const isAdmin = async (req, res, next) => {
     if (!req.isAuthenticated()) {
@@ -329,28 +328,28 @@ app.get('/admin', isAdmin, (req, res) => {
     res.redirect('/admin/dashboard');
 });
 
-// ... (rest of your admin routes)
-
 app.get('/dashboard', async (req, res) => {
     if (!req.isAuthenticated()) {
         return res.redirect('/');
     }
     
     try {
+        // Check if user is admin
+        const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+        const isAdmin = adminEmails.includes(req.user.email);
+        
+        console.log('User email:', req.user.email);
+        console.log('Is admin:', isAdmin);
+
         // Get all tasks
         const tasks = await Task.find();
         const currentUserId = req.user._id.toString();
-        
-        console.log('Current User ID:', currentUserId);
 
         // Map tasks to include user-specific status
         const userTasks = tasks.map(task => {
-            // Find user's submission by comparing string versions of IDs
             const userTask = task.userTasks.find(ut => 
                 ut.userId && ut.userId.toString() === currentUserId
             );
-            
-            console.log(`Task ${task.number} userTask:`, userTask);
 
             return {
                 _id: task._id,
@@ -368,7 +367,6 @@ app.get('/dashboard', async (req, res) => {
         // Sort tasks by number
         userTasks.sort((a, b) => a.number - b.number);
 
-        // Rest of your existing dashboard HTML rendering code...
         res.send(`
             <!DOCTYPE html>
             <html>
@@ -384,6 +382,11 @@ app.get('/dashboard', async (req, res) => {
                                 <h1 class="text-2xl font-bold text-gray-800">Training Dashboard</h1>
                             </div>
                             <div class="flex items-center space-x-4">
+                                ${isAdmin ? `
+                                    <a href="/admin/dashboard" class="text-blue-600 hover:text-blue-900">
+                                        Admin Dashboard
+                                    </a>
+                                ` : ''}
                                 <span class="text-gray-600">${req.user.displayName}</span>
                                 <a href="/logout" class="text-red-600 hover:text-red-900">Logout</a>
                             </div>
