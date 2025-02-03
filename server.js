@@ -14,13 +14,8 @@ const CALLBACK_URL = process.env.NODE_ENV === 'production'
     ? 'https://marathon-training-app.onrender.com/auth/google/callback'
     : 'http://localhost:3000/auth/google/callback';
 
+const app = express();
 
-
-
-const express = require('express');
-const session = require('express-session');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 
 // Connect to MongoDB
