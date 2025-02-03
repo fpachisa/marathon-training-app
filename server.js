@@ -465,33 +465,24 @@ app.get('/admin', isAdmin, (req, res) => {
 
 app.get('/admin/dashboard', isAdmin, async (req, res) => {
     try {
+        // Get all tasks with user submissions
         const tasks = await Task.find()
             .populate({
                 path: 'userTasks.userId',
                 select: 'displayName email'
             });
-        
-                    // Flatten the tasks and user submissions for display
-        const submissions = tasks.flatMap(task => 
-            task.userTasks.map(userTask => ({
-                taskId: task._id,
-                taskNumber: task.number,
-                taskTitle: task.title,
-                taskDescription: task.description,
-                userName: userTask.userId?.displayName || 'Unknown User',
-                userEmail: userTask.userId?.email || 'No email',
-                completed: userTask.completed,
-                screenshotUrl: userTask.screenshotUrl,
-                status: userTask.status,
-                feedback: userTask.feedback,
-                completedAt: userTask.completedAt
-            }))
-        ).sort((a, b) => b.completedAt - a.completedAt);
 
-        const totalTasks = tasks.length;
-        const approvedTasks = tasks.filter(t => t.status === 'approved').length;
-        const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-        const rejectedTasks = tasks.filter(t => t.status === 'rejected').length;
+        // Get statistics
+        const stats = {
+            totalSubmissions: tasks.reduce((acc, task) => acc + task.userTasks.length, 0),
+            pendingReviews: tasks.reduce((acc, task) => 
+                acc + task.userTasks.filter(ut => ut.status === 'pending').length, 0),
+            approvedTasks: tasks.reduce((acc, task) => 
+                acc + task.userTasks.filter(ut => ut.status === 'approved').length, 0),
+            rejectedTasks: tasks.reduce((acc, task) => 
+                acc + task.userTasks.filter(ut => ut.status === 'rejected').length, 0)
+        };
+
 
         res.send(`
             <!DOCTYPE html>
