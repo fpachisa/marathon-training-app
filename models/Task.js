@@ -1,4 +1,4 @@
-// First, let's verify our Task model (models/Task.js)
+// models/Task.js
 const mongoose = require('mongoose');
 
 const taskSchema = new mongoose.Schema({
@@ -37,3 +37,5 @@ const taskSchema = new mongoose.Schema({
         feedback: String
     }]
 });
+
+module.exports = mongoose.model('Task', taskSchema);
