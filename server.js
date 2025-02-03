@@ -467,26 +467,27 @@ app.get('/admin', isAdmin, (req, res) => {
 
 // ... (rest of your admin routes)
 
-// Update your dashboard route in server.js
 app.get('/dashboard', async (req, res) => {
     if (!req.isAuthenticated()) {
         return res.redirect('/');
     }
     
     try {
-        console.log('Fetching dashboard for user:', req.user._id);
+        // Get all tasks
+        const tasks = await Task.find();
+        const currentUserId = req.user._id.toString();
         
-        // Get all template tasks
-        const tasks = await Task.find({ isTemplate: true });
-        const userId = req.user._id;
-        
+        console.log('Current User ID:', currentUserId);
+
         // Map tasks to include user-specific status
         const userTasks = tasks.map(task => {
-            // Safely find user's submission
+            // Find user's submission by comparing string versions of IDs
             const userTask = task.userTasks.find(ut => 
-                ut.userId && ut.userId.toString() === userId.toString()
+                ut.userId && ut.userId.toString() === currentUserId
             );
             
+            console.log(`Task ${task.number} userTask:`, userTask);
+
             return {
                 _id: task._id,
                 number: task.number,
@@ -503,6 +504,7 @@ app.get('/dashboard', async (req, res) => {
         // Sort tasks by number
         userTasks.sort((a, b) => a.number - b.number);
 
+        // Rest of your existing dashboard HTML rendering code...
         res.send(`
             <!DOCTYPE html>
             <html>
@@ -511,7 +513,6 @@ app.get('/dashboard', async (req, res) => {
                 <script src="https://cdn.tailwindcss.com"></script>
             </head>
             <body class="bg-gray-50">
-                <!-- Navigation -->
                 <nav class="bg-white shadow-lg">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div class="flex justify-between h-16">
@@ -526,7 +527,6 @@ app.get('/dashboard', async (req, res) => {
                     </div>
                 </nav>
 
-                <!-- Main Content -->
                 <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
                     <div class="bg-white rounded-lg shadow">
                         <div class="p-6">
@@ -596,6 +596,7 @@ app.get('/dashboard', async (req, res) => {
 
     } catch (error) {
         console.error('Dashboard error:', error);
+        console.error('Error stack:', error.stack);
         res.status(500).send('Error loading dashboard');
     }
 });
