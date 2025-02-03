@@ -28,7 +28,8 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
 });
 
 
@@ -118,7 +119,8 @@ const storage = new CloudinaryStorage({
     params: {
         folder: 'marathon-training',
         allowed_formats: ['jpg', 'png', 'gif'],
-        transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+        transformation: [{ width: 1000, height: 1000, crop: 'limit' }],
+        format: 'jpg'
     }
 });
 
@@ -153,8 +155,9 @@ app.post('/complete-task/:taskId', upload.single('screenshot'), async (req, res)
         }
 
         const taskId = req.params.taskId;
-        const screenshotUrl = `${process.env.DOMAIN}/uploads/${req.file.filename}`;
+        const screenshotUrl = req.file.secure_url;
 
+        console.log('Screenshot URL:', screenshotUrl); // For debugging
         console.log('Updating task with screenshot:', screenshotUrl);
 
         const updatedTask = await Task.findByIdAndUpdate(
@@ -271,8 +274,7 @@ app.get('/', (req, res) => {
 });
 
 
-// Dashboard route
-// Update the dashboard route in server.js
+// Update the dashboard route to properly display images
 app.get('/dashboard', async (req, res) => {
     if (!req.isAuthenticated()) {
         return res.redirect('/');
@@ -295,10 +297,8 @@ app.get('/dashboard', async (req, res) => {
                 <nav class="bg-white shadow-lg">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div class="flex justify-between h-16">
-                            <div class="flex">
-                                <div class="flex-shrink-0 flex items-center">
-                                    <h1 class="text-2xl font-bold text-gray-800">Training Tracker</h1>
-                                </div>
+                            <div class="flex items-center">
+                                <h1 class="text-2xl font-bold text-gray-800">Training Tracker</h1>
                             </div>
                             <div class="flex items-center">
                                 ${isUserAdmin ? 
@@ -318,56 +318,28 @@ app.get('/dashboard', async (req, res) => {
                 </nav>
 
                 <!-- Main Content -->
-                <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                    <!-- Progress Overview -->
-                    <div class="mb-8 bg-white rounded-lg shadow p-6">
-                        <h2 class="text-xl font-semibold mb-4">Your Progress</h2>
-                        <div class="grid grid-cols-3 gap-4">
-                            <div class="bg-blue-50 p-4 rounded-lg">
-                                <div class="text-3xl font-bold text-blue-600">
-                                    ${tasks.filter(t => t.completed).length}/${tasks.length}
-                                </div>
-                                <div class="text-sm text-gray-600">Tasks Completed</div>
-                            </div>
-                            <div class="bg-green-50 p-4 rounded-lg">
-                                <div class="text-3xl font-bold text-green-600">
-                                    ${tasks.filter(t => t.status === 'approved').length}
-                                </div>
-                                <div class="text-sm text-gray-600">Tasks Approved</div>
-                            </div>
-                            <div class="bg-yellow-50 p-4 rounded-lg">
-                                <div class="text-3xl font-bold text-yellow-600">
-                                    ${tasks.filter(t => !t.completed).length}
-                                </div>
-                                <div class="text-sm text-gray-600">Tasks Remaining</div>
-                            </div>
-                        </div>
-                    </div>
-
+                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                     <!-- Tasks List -->
                     <div class="bg-white rounded-lg shadow">
                         <div class="p-6">
-                            <h2 class="text-xl font-semibold mb-4">Training Tasks</h2>
+                            <h2 class="text-xl font-semibold mb-4">Your Tasks</h2>
                             <div class="grid gap-6">
                                 ${tasks.map(task => `
-                                    <div class="border rounded-lg p-6 ${
-                                        task.completed ? 'bg-gray-50' : 'bg-white'
-                                    }">
+                                    <div class="border rounded-lg p-6 ${task.completed ? 'bg-gray-50' : 'bg-white'}">
                                         <div class="flex justify-between items-start">
                                             <div>
-                                                <h3 class="text-lg font-semibold">
-                                                    Task ${task.number}: ${task.title}
-                                                </h3>
+                                                <h3 class="text-lg font-semibold">Task ${task.number}: ${task.title}</h3>
                                                 <p class="text-gray-600 mt-1">${task.description}</p>
                                             </div>
                                             <div class="flex items-center">
-                                                ${task.status === 'approved' ? 
-                                                    '<span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">Approved</span>' :
-                                                    task.status === 'rejected' ? 
-                                                    '<span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm">Rejected</span>' :
-                                                    task.completed ?
-                                                    '<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">Pending Review</span>' :
-                                                    '<span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">Not Started</span>'
+                                                ${task.status ? 
+                                                    `<span class="px-3 py-1 ${
+                                                        task.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                        task.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                    } rounded-full text-sm">
+                                                        ${task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                                    </span>` : ''
                                                 }
                                             </div>
                                         </div>
@@ -375,10 +347,11 @@ app.get('/dashboard', async (req, res) => {
                                         ${task.completed ? `
                                             <div class="mt-4">
                                                 ${task.screenshotUrl ? `
-                                                    <div class="mt-2">
+                                                    <div class="mt-4">
+                                                        <h4 class="text-sm font-medium text-gray-700 mb-2">Screenshot:</h4>
                                                         <img src="${task.screenshotUrl}" 
                                                              alt="Task Screenshot" 
-                                                             class="rounded-lg max-w-md">
+                                                             class="rounded-lg max-w-xl shadow-sm hover:shadow-md transition-shadow duration-200"/>
                                                     </div>
                                                 ` : ''}
                                                 ${task.feedback ? `
@@ -389,26 +362,19 @@ app.get('/dashboard', async (req, res) => {
                                                 ` : ''}
                                             </div>
                                         ` : `
-                                            <form action="/complete-task/${task._id}" 
-                                                  method="POST" 
-                                                  enctype="multipart/form-data"
-                                                  class="mt-4">
-                                                <div class="flex items-center">
+                                            <form action="/complete-task/${task._id}" method="POST" enctype="multipart/form-data" class="mt-4">
+                                                <div class="flex flex-col space-y-2">
+                                                    <label class="text-sm font-medium text-gray-700">
+                                                        Upload Screenshot:
+                                                    </label>
                                                     <input type="file" 
                                                            name="screenshot" 
                                                            accept="image/*" 
                                                            required
-                                                           class="block w-full text-sm text-gray-500
-                                                                  file:mr-4 file:py-2 file:px-4
-                                                                  file:rounded-full file:border-0
-                                                                  file:text-sm file:font-semibold
-                                                                  file:bg-blue-50 file:text-blue-700
-                                                                  hover:file:bg-blue-100">
+                                                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
                                                     <button type="submit"
-                                                            class="ml-4 px-4 py-2 bg-blue-600 text-white 
-                                                                   rounded-lg hover:bg-blue-700 
-                                                                   transition-colors">
-                                                        Complete Task
+                                                            class="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                        <i class="fas fa-check mr-2"></i>Complete Task
                                                     </button>
                                                 </div>
                                             </form>
