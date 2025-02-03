@@ -42,6 +42,26 @@ const taskSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     }
+    // User-specific task status
+    userTasks: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        completed: {
+            type: Boolean,
+            default: false
+        },
+        screenshotUrl: String,
+        completedAt: Date,
+        status: {
+            type: String,
+            enum: ['pending', 'approved', 'rejected'],
+            default: 'pending'
+        },
+        feedback: String
+    }]
+
 });
 
 module.exports = mongoose.model('Task', taskSchema);

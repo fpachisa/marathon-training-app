@@ -157,18 +157,24 @@ app.post('/complete-task/:taskId', upload.single('screenshot'), async (req, res)
 
         const taskId = req.params.taskId;
         const screenshotUrl = req.file.secure_url || req.file.url || req.file.path;
+        const userId = req.user._id;
 
         console.log('Screenshot URL:', screenshotUrl); // For debugging
         console.log('Updating task with screenshot:', screenshotUrl);
 
-        const updatedTask = await Task.findByIdAndUpdate(
-            taskId,
+        // Update the task with user-specific status
+        const updatedTask = await Task.findOneAndUpdate(
+            { _id: taskId },
             {
-                completed: true,
-                screenshotUrl: screenshotUrl,
-                completedAt: new Date(),
-                userId: req.user._id,
-                status: 'pending'
+                $push: {
+                    userTasks: {
+                        userId: userId,
+                        completed: true,
+                        screenshotUrl: screenshotUrl,
+                        completedAt: new Date(),
+                        status: 'pending'
+                    }
+                }
             },
             { new: true }
         );
@@ -303,9 +309,27 @@ app.get('/dashboard', async (req, res) => {
     }
     
     try {
-        const tasks = await Task.find();
+        const tasks = await Task.find({ isTemplate: true });
+        const userId = req.user._id;
         const isUserAdmin = process.env.ADMIN_EMAILS?.split(',').includes(req.user.email);
+        // Map tasks to include user-specific status
+        const userTasks = tasks.map(task => {
+            const userTask = task.userTasks.find(ut => ut.userId.equals(userId));
+            return {
+                _id: task._id,
+                number: task.number,
+                title: task.title,
+                description: task.description,
+                completed: userTask ? userTask.completed : false,
+                screenshotUrl: userTask ? userTask.screenshotUrl : null,
+                status: userTask ? userTask.status : null,
+                feedback: userTask ? userTask.feedback : null,
+                completedAt: userTask ? userTask.completedAt : null
+            };
+        });
         
+        userTasks.sort((a, b) => a.number - b.number);
+
         res.send(`
             <!DOCTYPE html>
             <html>
@@ -441,12 +465,28 @@ app.get('/admin', isAdmin, (req, res) => {
 
 app.get('/admin/dashboard', isAdmin, async (req, res) => {
     try {
-        const tasks = await Task.find({ completed: true })
+        const tasks = await Task.find()
             .populate({
-                path: 'userId',
+                path: 'userTasks.userId',
                 select: 'displayName email'
-            })
-            .sort({ completedAt: -1 });
+            });
+        
+                    // Flatten the tasks and user submissions for display
+        const submissions = tasks.flatMap(task => 
+            task.userTasks.map(userTask => ({
+                taskId: task._id,
+                taskNumber: task.number,
+                taskTitle: task.title,
+                taskDescription: task.description,
+                userName: userTask.userId?.displayName || 'Unknown User',
+                userEmail: userTask.userId?.email || 'No email',
+                completed: userTask.completed,
+                screenshotUrl: userTask.screenshotUrl,
+                status: userTask.status,
+                feedback: userTask.feedback,
+                completedAt: userTask.completedAt
+            }))
+        ).sort((a, b) => b.completedAt - a.completedAt);
 
         const totalTasks = tasks.length;
         const approvedTasks = tasks.filter(t => t.status === 'approved').length;
@@ -686,6 +726,32 @@ app.get('/logout', (req, res) => {
         if (err) { return next(err); }
         res.redirect('/');
     });
+});
+
+// Add this temporary route to migrate data
+app.get('/admin/migrate-tasks', isAdmin, async (req, res) => {
+    try {
+        // Get all existing tasks
+        const tasks = await Task.find();
+        
+        // Update each task to use the new schema
+        for (const task of tasks) {
+            await Task.updateOne(
+                { _id: task._id },
+                {
+                    $set: {
+                        isTemplate: true,
+                        userTasks: []
+                    }
+                }
+            );
+        }
+        
+        res.send('Migration completed');
+    } catch (error) {
+        console.error('Migration error:', error);
+        res.status(500).send('Error during migration');
+    }
 });
 
 const PORT = process.env.PORT || 3000;
