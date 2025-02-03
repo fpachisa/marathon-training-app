@@ -153,9 +153,10 @@ app.post('/complete-task/:taskId', upload.single('screenshot'), async (req, res)
             console.log('No file uploaded');
             return res.status(400).json({ error: 'Screenshot is required' });
         }
+        console.log('Uploaded file details:', JSON.stringify(req.file, null, 2));
 
         const taskId = req.params.taskId;
-        const screenshotUrl = req.file.secure_url;
+        const screenshotUrl = req.file.secure_url || req.file.url || req.file.path;
 
         console.log('Screenshot URL:', screenshotUrl); // For debugging
         console.log('Updating task with screenshot:', screenshotUrl);
@@ -273,6 +274,27 @@ app.get('/', (req, res) => {
     `);
 });
 
+// Add this route to test Cloudinary configuration
+app.get('/test-cloudinary', async (req, res) => {
+    try {
+        const config = {
+            cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+            hasApiKey: !!process.env.CLOUDINARY_API_KEY,
+            hasApiSecret: !!process.env.CLOUDINARY_API_SECRET,
+            cloudinaryConfig: cloudinary.config()
+        };
+        
+        res.json({
+            status: 'success',
+            config: config
+        });
+    } catch (error) {
+        res.json({
+            status: 'error',
+            error: error.message
+        });
+    }
+});
 
 // Update the dashboard route to properly display images
 app.get('/dashboard', async (req, res) => {
