@@ -11,7 +11,7 @@ const Task = require('./models/Task');
 const MongoStore = require('connect-mongo');
 
 const CALLBACK_URL = process.env.NODE_ENV === 'production'
-    ? 'https://your-domain.com/auth/google/callback'
+    ? 'https://marathon-training-app.onrender.com/auth/google/callback'
     : 'http://localhost:3000/auth/google/callback';
 
 const app = express();
@@ -48,7 +48,8 @@ passport.use(
         {
     		clientID: process.env.GOOGLE_CLIENT_ID,
     		clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    		callbackURL: CALLBACK_URL
+    		callbackURL: CALLBACK_URL,
+		userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
         },
         async function(accessToken, refreshToken, profile, cb) {
             try {
