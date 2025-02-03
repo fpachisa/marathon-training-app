@@ -140,69 +140,57 @@ const upload = multer({
     }
 });
 
+// Update your complete-task route in server.js
 app.post('/complete-task/:taskId', upload.single('screenshot'), async (req, res) => {
     try {
-        console.log('Task completion request received:', req.params.taskId);
-        
         if (!req.isAuthenticated()) {
-            console.log('User not authenticated');
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
         if (!req.file) {
-            console.log('No file uploaded');
             return res.status(400).json({ error: 'Screenshot is required' });
         }
-        console.log('Uploaded file details:', JSON.stringify(req.file, null, 2));
 
         const taskId = req.params.taskId;
-        const screenshotUrl = req.file.secure_url || req.file.url || req.file.path;
         const userId = req.user._id;
+        const screenshotUrl = req.file.secure_url; // From Cloudinary
 
-        console.log('Screenshot URL:', screenshotUrl); // For debugging
-        console.log('Updating task with screenshot:', screenshotUrl);
+        console.log('Completing task:', { taskId, userId, screenshotUrl });
 
-        // Update the task with user-specific status
-        const updatedTask = await Task.findOneAndUpdate(
-            { _id: taskId },
-            {
-                $push: {
-                    userTasks: {
-                        userId: userId,
-                        completed: true,
-                        screenshotUrl: screenshotUrl,
-                        completedAt: new Date(),
-                        status: 'pending'
-                    }
-                }
-            },
-            { new: true }
-        );
-
-        if (!updatedTask) {
-            console.log('Task not found');
-            return res.status(404).json({ error: 'Task not found' });
+        // Find the task and update user's submission
+        const task = await Task.findById(taskId);
+        
+        if (!task) {
+            return res.status(404).send('Task not found');
         }
 
-        console.log('Task updated successfully:', updatedTask);
+        // Add the user's submission
+        task.userTasks.push({
+            userId: userId,
+            completed: true,
+            screenshotUrl: screenshotUrl,
+            completedAt: new Date(),
+            status: 'pending'
+        });
 
-        // If using email notifications
-        if (process.env.ADMIN_EMAIL && process.env.EMAIL_USER) {
+        await task.save();
+        console.log('Task updated successfully');
+
+        // Send email notification to admin
+        if (process.env.ADMIN_EMAIL) {
             try {
-                await sendTaskCompletionEmail(req.user, updatedTask, screenshotUrl);
-                console.log('Notification email sent');
+                await sendTaskCompletionEmail(req.user, task, screenshotUrl);
+                console.log('Admin notification email sent');
             } catch (emailError) {
                 console.error('Error sending email:', emailError);
-                // Continue even if email fails
             }
         }
 
-        // Redirect back to dashboard
         res.redirect('/dashboard');
 
     } catch (error) {
         console.error('Error completing task:', error);
-        res.status(500).json({ error: 'Error completing task' });
+        res.status(500).send('Error completing task');
     }
 });
 
@@ -572,34 +560,34 @@ app.get('/admin/dashboard', isAdmin, async (req, res) => {
                                                     </div>
                                                 ` : ''}
 
-                                                <form action="/admin/review-submission/${task._id}/${submission.userId}" 
-                                                      method="POST" 
-                                                      class="mt-4 space-y-4">
-                                                    <div>
-                                                        <select name="status" 
-                                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md">
-                                                            <option value="pending" ${submission.status === 'pending' ? 'selected' : ''}>
-                                                                Pending Review
-                                                            </option>
-                                                            <option value="approved" ${submission.status === 'approved' ? 'selected' : ''}>
-                                                                Approve
-                                                            </option>
-                                                            <option value="rejected" ${submission.status === 'rejected' ? 'selected' : ''}>
-                                                                Reject
-                                                            </option>
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <textarea name="feedback" 
-                                                                  placeholder="Provide feedback..."
-                                                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                                  rows="3">${submission.feedback || ''}</textarea>
-                                                    </div>
-                                                    <button type="submit" 
-                                                            class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
-                                                        Submit Review
-                                                    </button>
-                                                </form>
+                                                <form action="/admin/review-submission/${task._id}/${submission.userId._id}" 
+                                                method="POST" 
+                                                class="mt-4 space-y-4">
+                                                <div>
+                                                    <select name="status" 
+                                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md">
+                                                        <option value="pending" ${submission.status === 'pending' ? 'selected' : ''}>
+                                                            Pending Review
+                                                        </option>
+                                                        <option value="approved" ${submission.status === 'approved' ? 'selected' : ''}>
+                                                            Approve
+                                                        </option>
+                                                        <option value="rejected" ${submission.status === 'rejected' ? 'selected' : ''}>
+                                                            Reject
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <textarea name="feedback" 
+                                                            placeholder="Provide feedback..."
+                                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                                            rows="3">${submission.feedback || ''}</textarea>
+                                                </div>
+                                                <button type="submit" 
+                                                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                                                    Submit Review
+                                                </button>
+                                            </form>
                                             </div>
                                         `).join('')}
                                     </div>
@@ -617,23 +605,37 @@ app.get('/admin/dashboard', isAdmin, async (req, res) => {
     }
 });
 
-// Review submission route
+// Update the review submission route in server.js
 app.post('/admin/review-submission/:taskId/:userId', isAdmin, async (req, res) => {
     try {
         const { taskId, userId } = req.params;
         const { status, feedback } = req.body;
 
+        console.log('Reviewing submission:', { taskId, userId, status, feedback });
+
         const task = await Task.findById(taskId);
+        
         if (!task) {
+            console.log('Task not found');
             return res.status(404).send('Task not found');
         }
 
-        const submission = task.userTasks.find(ut => ut.userId.toString() === userId);
-        if (submission) {
-            submission.status = status;
-            submission.feedback = feedback;
-            await task.save();
+        // Find the user's submission
+        const submissionIndex = task.userTasks.findIndex(
+            ut => ut.userId.toString() === userId
+        );
+
+        if (submissionIndex === -1) {
+            console.log('Submission not found');
+            return res.status(404).send('Submission not found');
         }
+
+        // Update the submission
+        task.userTasks[submissionIndex].status = status;
+        task.userTasks[submissionIndex].feedback = feedback;
+
+        await task.save();
+        console.log('Review saved successfully');
 
         res.redirect('/admin/dashboard');
     } catch (error) {
