@@ -16,6 +16,21 @@ const CALLBACK_URL = process.env.NODE_ENV === 'production'
 
 const app = express();
 
+const fs = require('fs');
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
 
 
 // Connect to MongoDB
@@ -98,27 +113,102 @@ passport.deserializeUser(async (id, done) => {
 });
 
 // Multer configuration
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, 'uploads/'));
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'marathon-training',
+        allowed_formats: ['jpg', 'png', 'gif'],
+        transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
     }
 });
 
 const upload = multer({ 
     storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
     fileFilter: function (req, file, cb) {
-        if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
-            return cb(new Error('Only image files are allowed!'), false);
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(file.mimetype)) {
+            const error = new Error('Only .png, .jpg and .gif format allowed!');
+            error.code = 'INVALID_FILE_TYPE';
+            return cb(error, false);
         }
         cb(null, true);
     }
 });
 
+app.post('/complete-task/:taskId', upload.single('screenshot'), async (req, res) => {
+    try {
+        console.log('Task completion request received:', req.params.taskId);
+        
+        if (!req.isAuthenticated()) {
+            console.log('User not authenticated');
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        if (!req.file) {
+            console.log('No file uploaded');
+            return res.status(400).json({ error: 'Screenshot is required' });
+        }
+
+        const taskId = req.params.taskId;
+        const screenshotUrl = `${process.env.DOMAIN}/uploads/${req.file.filename}`;
+
+        console.log('Updating task with screenshot:', screenshotUrl);
+
+        const updatedTask = await Task.findByIdAndUpdate(
+            taskId,
+            {
+                completed: true,
+                screenshotUrl: screenshotUrl,
+                completedAt: new Date(),
+                userId: req.user._id,
+                status: 'pending'
+            },
+            { new: true }
+        );
+
+        if (!updatedTask) {
+            console.log('Task not found');
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        console.log('Task updated successfully:', updatedTask);
+
+        // If using email notifications
+        if (process.env.ADMIN_EMAIL && process.env.EMAIL_USER) {
+            try {
+                await sendTaskCompletionEmail(req.user, updatedTask, screenshotUrl);
+                console.log('Notification email sent');
+            } catch (emailError) {
+                console.error('Error sending email:', emailError);
+                // Continue even if email fails
+            }
+        }
+
+        // Redirect back to dashboard
+        res.redirect('/dashboard');
+
+    } catch (error) {
+        console.error('Error completing task:', error);
+        res.status(500).json({ error: 'Error completing task' });
+    }
+});
+
 // Serve static files
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File too large! Maximum size is 5MB.' });
+    }
+    if (err.code === 'INVALID_FILE_TYPE') {
+        return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Something went wrong!' });
+});
 
 // Test route
 app.get('/test', (req, res) => {
