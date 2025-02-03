@@ -7,7 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const { connectDB } = require('./config/database');
 const User = require('./models/User');
-const Task = require('./models/Task');
+const Task = mongoose.model('Task', taskSchema);
 const MongoStore = require('connect-mongo');
 
 const CALLBACK_URL = process.env.NODE_ENV === 'production'
@@ -794,6 +794,7 @@ app.get('/admin/initialize-tasks', isAdmin, async (req, res) => {
     }
 });
 
+module.exports = Task;
 // Add this route to verify MongoDB connection
 app.get('/admin/check-db', isAdmin, async (req, res) => {
     try {
@@ -835,9 +836,6 @@ app.get('/admin/check-db', isAdmin, async (req, res) => {
     }
 });
 
-const Task = mongoose.model('Task', taskSchema);
-
-module.exports = Task;
 
 // Now, let's create a detailed initialization route with proper error handling
 app.get('/admin/initialize-tasks', isAdmin, async (req, res) => {
