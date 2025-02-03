@@ -467,159 +467,136 @@ app.get('/admin', isAdmin, (req, res) => {
 
 // ... (rest of your admin routes)
 
-// Add this right after your admin middleware in server.js
-
-app.get('/admin/dashboard', isAdmin, async (req, res) => {
+// Update your dashboard route in server.js
+app.get('/dashboard', async (req, res) => {
+    if (!req.isAuthenticated()) {
+        return res.redirect('/');
+    }
+    
     try {
-        // Get all tasks with user submissions
-        const tasks = await Task.find()
-            .populate({
-                path: 'userTasks.userId',
-                select: 'displayName email'
-            });
+        console.log('Fetching dashboard for user:', req.user._id);
+        
+        // Get all template tasks
+        const tasks = await Task.find({ isTemplate: true });
+        const userId = req.user._id;
+        
+        // Map tasks to include user-specific status
+        const userTasks = tasks.map(task => {
+            // Safely find user's submission
+            const userTask = task.userTasks.find(ut => 
+                ut.userId && ut.userId.toString() === userId.toString()
+            );
+            
+            return {
+                _id: task._id,
+                number: task.number,
+                title: task.title,
+                description: task.description,
+                completed: userTask ? userTask.completed : false,
+                screenshotUrl: userTask ? userTask.screenshotUrl : null,
+                status: userTask ? userTask.status : null,
+                feedback: userTask ? userTask.feedback : null,
+                completedAt: userTask ? userTask.completedAt : null
+            };
+        });
 
-        // Get statistics
-        const stats = {
-            totalSubmissions: tasks.reduce((acc, task) => acc + task.userTasks.length, 0),
-            pendingReviews: tasks.reduce((acc, task) => 
-                acc + task.userTasks.filter(ut => ut.status === 'pending').length, 0),
-            approvedTasks: tasks.reduce((acc, task) => 
-                acc + task.userTasks.filter(ut => ut.status === 'approved').length, 0),
-            rejectedTasks: tasks.reduce((acc, task) => 
-                acc + task.userTasks.filter(ut => ut.status === 'rejected').length, 0)
-        };
+        // Sort tasks by number
+        userTasks.sort((a, b) => a.number - b.number);
 
         res.send(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Admin Dashboard</title>
+                <title>Training Dashboard</title>
                 <script src="https://cdn.tailwindcss.com"></script>
-                <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
             </head>
             <body class="bg-gray-50">
+                <!-- Navigation -->
                 <nav class="bg-white shadow-lg">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div class="flex justify-between h-16">
                             <div class="flex items-center">
-                                <h1 class="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
+                                <h1 class="text-2xl font-bold text-gray-800">Training Dashboard</h1>
                             </div>
                             <div class="flex items-center space-x-4">
-                                <a href="/dashboard" class="text-gray-600 hover:text-gray-900">
-                                    <i class="fas fa-home mr-2"></i>Main Dashboard
-                                </a>
-                                <a href="/admin/initialize-tasks" class="text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-sync mr-2"></i>Reset Tasks
-                                </a>
-                                <a href="/logout" class="text-red-600 hover:text-red-900">
-                                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                                </a>
+                                <span class="text-gray-600">${req.user.displayName}</span>
+                                <a href="/logout" class="text-red-600 hover:text-red-900">Logout</a>
                             </div>
                         </div>
                     </div>
                 </nav>
 
-                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                    <!-- Statistics -->
-                    <div class="grid grid-cols-4 gap-4 mb-8">
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="text-2xl font-bold text-blue-600">${stats.totalSubmissions}</div>
-                            <div class="text-gray-600">Total Submissions</div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="text-2xl font-bold text-yellow-600">${stats.pendingReviews}</div>
-                            <div class="text-gray-600">Pending Reviews</div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="text-2xl font-bold text-green-600">${stats.approvedTasks}</div>
-                            <div class="text-gray-600">Approved</div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="text-2xl font-bold text-red-600">${stats.rejectedTasks}</div>
-                            <div class="text-gray-600">Rejected</div>
-                        </div>
-                    </div>
-
-                    <!-- Task Submissions -->
+                <!-- Main Content -->
+                <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
                     <div class="bg-white rounded-lg shadow">
                         <div class="p-6">
-                            <h2 class="text-xl font-semibold mb-6">Task Submissions</h2>
-                            ${tasks.map(task => {
-                                const submissions = task.userTasks.filter(ut => ut.completed);
-                                if (submissions.length === 0) return '';
-                                
-                                return `
-                                    <div class="mb-8 border-b pb-6">
-                                        <h3 class="text-lg font-semibold mb-4">Task ${task.number}: ${task.title}</h3>
-                                        ${submissions.map(submission => `
-                                            <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                                                <div class="flex justify-between items-start">
-                                                    <div>
-                                                        <p class="font-medium">${submission.userId?.displayName || 'Unknown User'}</p>
-                                                        <p class="text-sm text-gray-600">${submission.userId?.email || 'No email'}</p>
-                                                        <p class="text-sm text-gray-600">
-                                                            Submitted: ${new Date(submission.completedAt).toLocaleString()}
-                                                        </p>
-                                                    </div>
-                                                    <span class="px-3 py-1 ${
-                                                        submission.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                                        submission.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                                        'bg-yellow-100 text-yellow-800'
-                                                    } rounded-full text-sm">
-                                                        ${submission.status}
-                                                    </span>
-                                                </div>
-                                                
-                                                ${submission.screenshotUrl ? `
-                                                    <div class="mt-4">
-                                                        <img src="${submission.screenshotUrl}" 
+                            <h2 class="text-xl font-semibold mb-4">Your Training Tasks</h2>
+                            <div class="space-y-6">
+                                ${userTasks.map(task => `
+                                    <div class="border rounded-lg p-6 ${task.completed ? 'bg-gray-50' : 'bg-white'}">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <h3 class="text-lg font-semibold">Task ${task.number}: ${task.title}</h3>
+                                                <p class="text-gray-600 mt-1">${task.description}</p>
+                                            </div>
+                                            ${task.status ? `
+                                                <span class="px-3 py-1 ${
+                                                    task.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                    task.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                    'bg-yellow-100 text-yellow-800'
+                                                } rounded-full text-sm">
+                                                    ${task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                                </span>
+                                            ` : ''}
+                                        </div>
+                                        
+                                        ${task.completed ? `
+                                            <div class="mt-4">
+                                                ${task.screenshotUrl ? `
+                                                    <div class="mt-2">
+                                                        <img src="${task.screenshotUrl}" 
                                                              alt="Task Screenshot" 
                                                              class="rounded-lg max-w-xl"/>
                                                     </div>
                                                 ` : ''}
-
-                                                <form action="/admin/review-submission/${task._id}/${submission.userId._id}" 
-                                                method="POST" 
-                                                class="mt-4 space-y-4">
-                                                <div>
-                                                    <select name="status" 
-                                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md">
-                                                        <option value="pending" ${submission.status === 'pending' ? 'selected' : ''}>
-                                                            Pending Review
-                                                        </option>
-                                                        <option value="approved" ${submission.status === 'approved' ? 'selected' : ''}>
-                                                            Approve
-                                                        </option>
-                                                        <option value="rejected" ${submission.status === 'rejected' ? 'selected' : ''}>
-                                                            Reject
-                                                        </option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <textarea name="feedback" 
-                                                            placeholder="Provide feedback..."
-                                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                            rows="3">${submission.feedback || ''}</textarea>
-                                                </div>
-                                                <button type="submit" 
-                                                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
-                                                    Submit Review
-                                                </button>
-                                            </form>
+                                                ${task.feedback ? `
+                                                    <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                                                        <h4 class="font-semibold text-blue-900">Feedback:</h4>
+                                                        <p class="text-blue-800">${task.feedback}</p>
+                                                    </div>
+                                                ` : ''}
                                             </div>
-                                        `).join('')}
+                                        ` : `
+                                            <form action="/complete-task/${task._id}" 
+                                                  method="POST" 
+                                                  enctype="multipart/form-data" 
+                                                  class="mt-4">
+                                                <div class="flex items-center space-x-4">
+                                                    <input type="file" 
+                                                           name="screenshot" 
+                                                           accept="image/*" 
+                                                           required
+                                                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                                                    <button type="submit"
+                                                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                                        Complete Task
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        `}
                                     </div>
-                                `;
-                            }).join('')}
+                                `).join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
             </body>
             </html>
         `);
+
     } catch (error) {
-        console.error('Admin dashboard error:', error);
-        res.status(500).send('Error loading admin dashboard');
+        console.error('Dashboard error:', error);
+        res.status(500).send('Error loading dashboard');
     }
 });
 
