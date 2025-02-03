@@ -14,7 +14,7 @@ const CALLBACK_URL = process.env.NODE_ENV === 'production'
     ? 'https://marathon-training-app.onrender.com/auth/google/callback'
     : 'http://localhost:3000/auth/google/callback';
 
-const app = express();
+
 
 
 const express = require('express');
