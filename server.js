@@ -7,6 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const { connectDB } = require('./config/database');
 const User = require('./models/User');
+const mongoose = require('mongoose');
 const Task = mongoose.model('Task', taskSchema);
 const MongoStore = require('connect-mongo');
 
