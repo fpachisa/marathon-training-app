@@ -483,43 +483,29 @@ app.get('/admin/dashboard', isAdmin, async (req, res) => {
                 acc + task.userTasks.filter(ut => ut.status === 'rejected').length, 0)
         };
 
-
         res.send(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Admin Dashboard - Training Tracker</title>
+                <title>Admin Dashboard</title>
                 <script src="https://cdn.tailwindcss.com"></script>
                 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-                <script>
-                    function previewImage(input) {
-                        if (input.files && input.files[0]) {
-                            const reader = new FileReader();
-                            reader.onload = function(e) {
-                                document.getElementById('preview').src = e.target.result;
-                                document.getElementById('preview').style.display = 'block';
-                            }
-                            reader.readAsDataURL(input.files[0]);
-                        }
-                    }
-                </script>
             </head>
-            <body class="bg-gray-50 min-h-screen">
-                <!-- Navigation -->
+            <body class="bg-gray-50">
                 <nav class="bg-white shadow-lg">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div class="flex justify-between h-16">
                             <div class="flex items-center">
-                                <h1 class="text-2xl font-bold text-gray-800">
-                                    <i class="fas fa-shield-alt text-blue-600 mr-2"></i>
-                                    Admin Dashboard
-                                </h1>
+                                <h1 class="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
                             </div>
                             <div class="flex items-center space-x-4">
-                                <a href="/dashboard" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                                <a href="/dashboard" class="text-gray-600 hover:text-gray-900">
                                     <i class="fas fa-home mr-2"></i>Main Dashboard
                                 </a>
-                                <a href="/logout" class="text-red-600 hover:text-red-900 px-3 py-2 rounded-md text-sm font-medium">
+                                <a href="/admin/initialize-tasks" class="text-blue-600 hover:text-blue-900">
+                                    <i class="fas fa-sync mr-2"></i>Reset Tasks
+                                </a>
+                                <a href="/logout" class="text-red-600 hover:text-red-900">
                                     <i class="fas fa-sign-out-alt mr-2"></i>Logout
                                 </a>
                             </div>
@@ -527,141 +513,98 @@ app.get('/admin/dashboard', isAdmin, async (req, res) => {
                     </div>
                 </nav>
 
-                <!-- Main Content -->
                 <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                    <!-- Statistics Cards -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                                    <i class="fas fa-tasks text-blue-600 text-xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h2 class="text-gray-600 text-sm">Total Submissions</h2>
-                                    <p class="text-2xl font-semibold text-gray-800">${totalTasks}</p>
-                                </div>
-                            </div>
+                    <!-- Statistics -->
+                    <div class="grid grid-cols-4 gap-4 mb-8">
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="text-2xl font-bold text-blue-600">${stats.totalSubmissions}</div>
+                            <div class="text-gray-600">Total Submissions</div>
                         </div>
-                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
-                                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h2 class="text-gray-600 text-sm">Approved</h2>
-                                    <p class="text-2xl font-semibold text-gray-800">${approvedTasks}</p>
-                                </div>
-                            </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="text-2xl font-bold text-yellow-600">${stats.pendingReviews}</div>
+                            <div class="text-gray-600">Pending Reviews</div>
                         </div>
-                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-                                    <i class="fas fa-clock text-yellow-600 text-xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h2 class="text-gray-600 text-sm">Pending Review</h2>
-                                    <p class="text-2xl font-semibold text-gray-800">${pendingTasks}</p>
-                                </div>
-                            </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="text-2xl font-bold text-green-600">${stats.approvedTasks}</div>
+                            <div class="text-gray-600">Approved</div>
                         </div>
-                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 bg-red-100 rounded-md p-3">
-                                    <i class="fas fa-times-circle text-red-600 text-xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h2 class="text-gray-600 text-sm">Rejected</h2>
-                                    <p class="text-2xl font-semibold text-gray-800">${rejectedTasks}</p>
-                                </div>
-                            </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="text-2xl font-bold text-red-600">${stats.rejectedTasks}</div>
+                            <div class="text-gray-600">Rejected</div>
                         </div>
                     </div>
 
-                    <!-- Tasks List -->
-                    <div class="bg-white rounded-xl shadow-md">
+                    <!-- Task Submissions -->
+                    <div class="bg-white rounded-lg shadow">
                         <div class="p-6">
-                            <h2 class="text-xl font-semibold text-gray-800 mb-6">
-                                <i class="fas fa-list-check mr-2 text-blue-600"></i>
-                                Task Submissions
-                            </h2>
-                            <div class="space-y-6">
-                                ${tasks.map(task => `
-                                    <div class="border rounded-xl p-6 hover:shadow-md transition-shadow duration-200">
-                                        <div class="flex justify-between items-start">
-                                            <div class="flex-1">
-                                                <div class="flex items-center">
-                                                    <h3 class="text-lg font-semibold text-gray-800">
-                                                        Task ${task.number}: ${task.title}
-                                                    </h3>
-                                                    <span class="ml-3 px-3 py-1 ${
-                                                        task.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                                        task.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            <h2 class="text-xl font-semibold mb-6">Task Submissions</h2>
+                            ${tasks.map(task => {
+                                const submissions = task.userTasks.filter(ut => ut.completed);
+                                if (submissions.length === 0) return '';
+                                
+                                return `
+                                    <div class="mb-8 border-b pb-6">
+                                        <h3 class="text-lg font-semibold mb-4">Task ${task.number}: ${task.title}</h3>
+                                        ${submissions.map(submission => `
+                                            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                                                <div class="flex justify-between items-start">
+                                                    <div>
+                                                        <p class="font-medium">${submission.userId?.displayName || 'Unknown User'}</p>
+                                                        <p class="text-sm text-gray-600">${submission.userId?.email || 'No email'}</p>
+                                                        <p class="text-sm text-gray-600">
+                                                            Submitted: ${new Date(submission.completedAt).toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                    <span class="px-3 py-1 ${
+                                                        submission.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                        submission.status === 'rejected' ? 'bg-red-100 text-red-800' :
                                                         'bg-yellow-100 text-yellow-800'
-                                                    } rounded-full text-sm font-medium">
-                                                        ${task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                                    } rounded-full text-sm">
+                                                        ${submission.status}
                                                     </span>
                                                 </div>
-                                                <p class="text-gray-600 mt-2">${task.description}</p>
-                                                <div class="mt-3 text-sm text-gray-500 space-y-1">
-                                                    <p>
-                                                        <i class="fas fa-user mr-2"></i>
-                                                        Submitted by: ${task.userId ? task.userId.displayName : 'Unknown'}
-                                                    </p>
-                                                    <p>
-                                                        <i class="fas fa-envelope mr-2"></i>
-                                                        ${task.userId ? task.userId.email : 'No email'}
-                                                    </p>
-                                                    <p>
-                                                        <i class="fas fa-calendar mr-2"></i>
-                                                        Submitted on: ${new Date(task.completedAt).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                
+                                                ${submission.screenshotUrl ? `
+                                                    <div class="mt-4">
+                                                        <img src="${submission.screenshotUrl}" 
+                                                             alt="Task Screenshot" 
+                                                             class="rounded-lg max-w-xl"/>
+                                                    </div>
+                                                ` : ''}
 
-                                        ${task.screenshotUrl ? `
-                                            <div class="mt-4">
-                                                <p class="text-sm font-medium text-gray-700 mb-2">
-                                                    <i class="fas fa-image mr-2"></i>Screenshot
-                                                </p>
-                                                <img src="${task.screenshotUrl}" 
-                                                     alt="Task Screenshot" 
-                                                     class="rounded-lg max-w-md shadow-sm hover:shadow-md transition-shadow duration-200">
+                                                <form action="/admin/review-submission/${task._id}/${submission.userId}" 
+                                                      method="POST" 
+                                                      class="mt-4 space-y-4">
+                                                    <div>
+                                                        <select name="status" 
+                                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-md">
+                                                            <option value="pending" ${submission.status === 'pending' ? 'selected' : ''}>
+                                                                Pending Review
+                                                            </option>
+                                                            <option value="approved" ${submission.status === 'approved' ? 'selected' : ''}>
+                                                                Approve
+                                                            </option>
+                                                            <option value="rejected" ${submission.status === 'rejected' ? 'selected' : ''}>
+                                                                Reject
+                                                            </option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <textarea name="feedback" 
+                                                                  placeholder="Provide feedback..."
+                                                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                                                  rows="3">${submission.feedback || ''}</textarea>
+                                                    </div>
+                                                    <button type="submit" 
+                                                            class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                                                        Submit Review
+                                                    </button>
+                                                </form>
                                             </div>
-                                        ` : ''}
-
-                                        <form class="mt-6 pt-6 border-t" action="/admin/review-task/${task._id}" method="POST">
-                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Review Status
-                                                    </label>
-                                                    <select name="status" required
-                                                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                                        <option value="pending" ${task.status === 'pending' ? 'selected' : ''}>Pending Review</option>
-                                                        <option value="approved" ${task.status === 'approved' ? 'selected' : ''}>Approve</option>
-                                                        <option value="rejected" ${task.status === 'rejected' ? 'selected' : ''}>Reject</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Feedback to User
-                                                    </label>
-                                                    <textarea name="feedback" rows="3"
-                                                              class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                                              placeholder="Provide feedback for the user...">${task.feedback || ''}</textarea>
-                                                </div>
-                                            </div>
-                                            <div class="mt-4 flex justify-end">
-                                                <button type="submit"
-                                                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200">
-                                                    <i class="fas fa-save mr-2"></i>Submit Review
-                                                </button>
-                                            </div>
-                                        </form>
+                                        `).join('')}
                                     </div>
-                                `).join('')}
-                            </div>
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 </div>
@@ -673,23 +616,29 @@ app.get('/admin/dashboard', isAdmin, async (req, res) => {
         res.status(500).send('Error loading admin dashboard');
     }
 });
-// Handle task review submissions
-app.post('/admin/review-task/:taskId', isAdmin, async (req, res) => {
+
+// Review submission route
+app.post('/admin/review-submission/:taskId/:userId', isAdmin, async (req, res) => {
     try {
-        const { taskId } = req.params;
+        const { taskId, userId } = req.params;
         const { status, feedback } = req.body;
-        
-        await Task.findByIdAndUpdate(taskId, {
-            status,
-            feedback,
-            reviewedAt: new Date(),
-            reviewedBy: req.user._id
-        });
+
+        const task = await Task.findById(taskId);
+        if (!task) {
+            return res.status(404).send('Task not found');
+        }
+
+        const submission = task.userTasks.find(ut => ut.userId.toString() === userId);
+        if (submission) {
+            submission.status = status;
+            submission.feedback = feedback;
+            await task.save();
+        }
 
         res.redirect('/admin/dashboard');
     } catch (error) {
         console.error('Review submission error:', error);
-        res.status(500).send('Error submitting review');
+        res.status(500).send('Error updating review');
     }
 });
 
