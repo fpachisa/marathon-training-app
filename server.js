@@ -754,6 +754,46 @@ app.get('/admin/migrate-tasks', isAdmin, async (req, res) => {
     }
 });
 
+// Add this route to create default tasks
+app.get('/admin/initialize-tasks', isAdmin, async (req, res) => {
+    try {
+        // First, check if we already have template tasks
+        const existingTasks = await Task.find({ isTemplate: true });
+        
+        if (existingTasks.length === 0) {
+            // Create default tasks
+            const defaultTasks = [
+                { number: 1, title: "5K Training Run", description: "Complete a 5K training run at comfortable pace", isTemplate: true },
+                { number: 2, title: "Interval Training", description: "Complete 6x400m interval training", isTemplate: true },
+                { number: 3, title: "Long Run", description: "Complete a 10K long run", isTemplate: true },
+                { number: 4, title: "Recovery Run", description: "30-minute easy recovery run", isTemplate: true },
+                { number: 5, title: "Tempo Run", description: "25-minute tempo run at half marathon pace", isTemplate: true },
+                { number: 6, title: "Hill Training", description: "Complete 6 hill repeats", isTemplate: true },
+                { number: 7, title: "Distance Run", description: "Complete a 15K run", isTemplate: true },
+                { number: 8, title: "Speed Work", description: "8x200m sprint intervals", isTemplate: true },
+                { number: 9, title: "Peak Long Run", description: "Complete an 18K run", isTemplate: true },
+                { number: 10, title: "Final Preparation", description: "10K run at race pace", isTemplate: true }
+            ];
+
+            await Task.insertMany(defaultTasks);
+            console.log('Default tasks created');
+        }
+
+        // Get all tasks to verify
+        const allTasks = await Task.find({ isTemplate: true });
+        
+        res.send(`
+            <h1>Tasks Initialized</h1>
+            <p>Number of tasks: ${allTasks.length}</p>
+            <pre>${JSON.stringify(allTasks, null, 2)}</pre>
+            <a href="/dashboard">Go to Dashboard</a>
+        `);
+    } catch (error) {
+        console.error('Error initializing tasks:', error);
+        res.status(500).send('Error initializing tasks');
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
